@@ -3563,5 +3563,8 @@ if ( NODEJS ) {
 	var sizeOf = require("image-size");
 
 	// B: Export module
-	module.exports = new PptxGenJS();
+	// module.exports = new PptxGenJS();
+  // HACK See issue "Can't create multiple presentations in node"
+  // [https://github.com/gitbrent/PptxGenJS/issues/83]
+  module.exports = PptxGenJS
 }
