@@ -50,15 +50,6 @@ Number.isInteger = Number.isInteger || function(value) {
 	return typeof value === "number" && isFinite(value) && Math.floor(value) === value;
 };
 
-// Detect Node.js
-var NODEJS = ( typeof module !== 'undefined' && module.exports );
-
-// [Node.js] <script> includes
-if ( NODEJS ) {
-	var gObjPptxMasters = require('../dist/pptxgen.masters.js');
-	var gObjPptxShapes  = require('../dist/pptxgen.shapes.js');
-}
-
 var PptxGenJS = function(){
 	// CONSTANTS
 	var APP_VER = "1.7.0-beta";
@@ -136,7 +127,7 @@ var PptxGenJS = function(){
 	this.shapes  = ( typeof gObjPptxShapes  !== 'undefined' ? gObjPptxShapes  : BASE_SHAPES );
 
 	// D: Fall back to base shapes if shapes file was not linked
-	gObjPptxShapes = ( gObjPptxShapes || this.shapes );
+	gObjPptxShapes = ( window.gObjPptxShapes || this.shapes );
 
 	/* ===============================================================================================
 	|
@@ -402,21 +393,7 @@ var PptxGenJS = function(){
 		Promise.all( arrChartPromises )
 		.then(function(arrResults){
 			var strExportName = ((gObjPptx.fileName.toLowerCase().indexOf('.ppt') > -1) ? gObjPptx.fileName : gObjPptx.fileName+gObjPptx.fileExtn);
-			if ( NODEJS ) {
-				if ( callback ) {
-					if ( strExportName.indexOf('http') == 0 ) {
-						zip.generateAsync({type:'nodebuffer'}).then(function(content){ callback(content); });
-					}
-					else {
-						zip.generateAsync({type:'nodebuffer'}).then(function(content){ fs.writeFile(strExportName, content, callback(strExportName)); });
-					}
-				}
-				else
-					zip.generateAsync({type:'nodebuffer'}).then(function(content){ fs.writeFile(strExportName, content); });
-			}
-			else {
-				zip.generateAsync({type:'blob'}).then(function(content){ writeFileToBrowser(strExportName, content, callback); });
-			}
+      zip.generateAsync({type:'blob'}).then(function(content){ writeFileToBrowser(strExportName, content, callback); });
 		})
 		.catch(function(strErr){
 			console.error(strErr);
@@ -488,17 +465,6 @@ var PptxGenJS = function(){
 	}
 
 	function getSizeFromImage(inImgUrl) {
-		if ( NODEJS ) {
-			try {
-				var dimensions = sizeOf(inImgUrl);
-				return { width:dimensions.width, height:dimensions.height };
-			}
-			catch(ex) {
-				console.error('ERROR: Unable to read image: '+inImgUrl);
-				return { width:0, height:0 };
-			}
-		}
-
 		// A: Create
 		var image = new Image();
 
@@ -2700,22 +2666,9 @@ var PptxGenJS = function(){
 			slide.rels.forEach(function(rel,idy){
 				// Read and Encode each image into base64 for use in export
 				if ( rel.type != 'online' && rel.type != 'chart' && !rel.data && $.inArray(rel.path, arrRelsDone) == -1 ) {
-					// Node encoding is syncronous, so we can load all images here, then call export with a callback (if any)
-					if ( NODEJS ) {
-						try {
-							var bitmap = fs.readFileSync(rel.path);
-							rel.data = new Buffer(bitmap).toString('base64');
-						}
-						catch(ex) {
-							console.error('ERROR: Unable to read media: '+rel.path);
-							rel.data = IMG_BROKEN;
-						}
-					}
-					else {
-						intRels++;
-						convertImgToDataURLviaCanvas(rel);
-						arrRelsDone.push(rel.path);
-					}
+          intRels++;
+          convertImgToDataURLviaCanvas(rel);
+          arrRelsDone.push(rel.path);
 				}
 			});
 		});
@@ -2918,8 +2871,6 @@ var PptxGenJS = function(){
 			if ( strImageData && /image\/(\w+)\;/.exec(strImageData) && /image\/(\w+)\;/.exec(strImageData).length > 0 ) {
 				strImgExtn = /image\/(\w+)\;/.exec(strImageData)[1];
 			}
-			// Node.js can read/base64-encode any image, so take at face value
-			if ( NODEJS && strImagePath.indexOf('.') > -1 ) strImgExtn = strImagePath.split('.').pop();
 
 			gObjPptx.slides[slideNum].data[slideObjNum]       = {};
 			gObjPptx.slides[slideNum].data[slideObjNum].type  = 'image';
@@ -3553,15 +3504,3 @@ var PptxGenJS = function(){
 		});
 	}
 };
-
-// [Node.js] support
-if ( NODEJS ) {
-	// A: Load depdendencies
-	var fs = require("fs");
-	var $ = require("jquery-node");
-	var JSZip = require("jszip");
-	var sizeOf = require("image-size");
-
-	// B: Export module
-	module.exports = new PptxGenJS();
-}
